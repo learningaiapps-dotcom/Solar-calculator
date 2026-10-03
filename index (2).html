@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Solar Energy Calculator</title>
+<style>
+:root{--bg:#f6f7f2;--card:#fff;--tx:#1d2a1f;--mu:#5b6b5e;--ac:#e8890c;--ln:#dfe3d8;--ok:#2b7a3d;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141a15;--card:#1d261f;--tx:#eef2ea;--mu:#9fb0a2;--ln:#2f3b31;--ok:#6fd18a}}
+:root[data-theme="dark"]{--bg:#141a15;--card:#1d261f;--tx:#eef2ea;--mu:#9fb0a2;--ln:#2f3b31;--ok:#6fd18a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.45}
+main{max-width:760px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:1.5rem;margin:0 0 4px}
+p.s{color:var(--mu);margin:0 0 18px}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:16px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+label{display:block;font-size:.85rem;color:var(--mu);margin-bottom:4px}
+input,select{width:100%;padding:10px;border:1px solid var(--ln);border-radius:8px;background:var(--bg);color:var(--tx);font-size:1rem}
+small{color:var(--mu);font-size:.78rem}
+.res{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.k{border:1px solid var(--ln);border-radius:10px;padding:12px}
+.k b{display:block;font-size:1.35rem;color:var(--ac)}
+.k span{font-size:.8rem;color:var(--mu)}
+.bars{display:flex;align-items:flex-end;gap:4px;height:110px;margin-top:8px}
+.bars div{flex:1;background:var(--ac);border-radius:4px 4px 0 0;min-height:2px}
+.lab{display:flex;gap:4px}.lab span{flex:1;text-align:center;font-size:.65rem;color:var(--mu)}
+.note{font-size:.8rem;color:var(--mu)}
+</style>
+</head>
+<body>
+<main>
+<h1>☀️ Solar Energy Calculator</h1>
+<p class="s">Pick a location, see its sunlight (GHI), and get a solar system estimate.</p>
+
+<div class="card">
+<div class="grid">
+<div><label>City (approximate GHI)</label>
+<select id="city"></select></div>
+<div><label>GHI (kWh/m²/day) — edit for your exact site</label>
+<input id="ghi" type="number" step="0.1" min="1" max="8" value="5.5">
+<small>Exact value: Global Solar Atlas or NASA POWER</small></div>
+<div><label>Monthly electricity use (units/kWh)</label>
+<input id="use" type="number" min="0" value="500"></div>
+<div><label>Electricity tariff (₹ per unit)</label>
+<input id="tar" type="number" step="0.1" min="0" value="8"></div>
+<div><label>Panel size (Watt)</label>
+<input id="pw" type="number" min="100" value="550"></div>
+<div><label>System cost (₹ per kW)</label>
+<input id="cost" type="number" min="0" value="55000"></div>
+<div><label>Performance ratio (%)</label>
+<input id="pr" type="number" min="50" max="95" value="78">
+<small>Losses from heat, dust, wiring, inverter (75–80% typical)</small></div>
+</div>
+</div>
+
+<div class="card">
+<div class="res" id="out"></div>
+<div class="bars" id="bars"></div><div class="lab" id="lab"></div>
+<p class="note" id="n"></p>
+</div>
+<p class="note">Estimates only. Formula: daily energy = system kW × GHI × performance ratio. Real output varies with roof tilt, direction, shading and season. City values are approximate annual averages.</p>
+</main>
+<script>
+var C={"Ahmedabad":5.5,"Surat":5.4,"Rajkot":5.6,"Jaipur":5.6,"Jodhpur":5.8,"Delhi":5.2,"Mumbai":5.3,"Pune":5.5,"Bengaluru":5.4,"Chennai":5.4,"Hyderabad":5.5,"Kolkata":4.7,"Lucknow":5.1,"Nagpur":5.4,"Bhopal":5.5};
+var $=function(i){return document.getElementById(i)};
+var sel=$("city");
+sel.innerHTML='<option value="">Custom (type GHI)</option>'+Object.keys(C).map(function(k){return '<option>'+k+'</option>'}).join("");
+sel.value="Ahmedabad";
+sel.onchange=function(){if(C[sel.value]){$("ghi").value=C[sel.value]}calc()};
+["ghi","use","tar","pw","cost","pr"].forEach(function(i){$(i).oninput=calc});
+var M=["J","F","M","A","M","J","J","A","S","O","N","D"];
+var F=[.92,1,1.1,1.15,1.12,.85,.68,.7,.9,1,.93,.88];
+function f(n,d){return Number(n).toLocaleString("en-IN",{maximumFractionDigits:d||0})}
+function calc(){
+var g=+$("ghi").value,u=+$("use").value,t=+$("tar").value,pw=+$("pw").value,c=+$("cost").value,pr=+$("pr").value/100;
+if(!(g>0&&pr>0&&pw>0)){return}
+var daily=u/30,kw=daily/(g*pr);
+var panels=Math.ceil(kw*1000/pw),kwa=panels*pw/1000;
+var perDay=kwa*g*pr,yr=perDay*365;
+var cost=kwa*c,sav=Math.min(yr,u*12)*t,pay=sav>0?cost/sav:0;
+var co2=yr*0.7/1000,area=kwa*6;
+var k=[["System size",f(kwa,2)+" kW"],["Panels needed",f(panels)+" × "+pw+"W"],["Roof area (approx)",f(area)+" m²"],["Energy per day",f(perDay,1)+" kWh"],["Energy per year",f(yr)+" kWh"],["Yearly savings","₹"+f(sav)],["Estimated cost","₹"+f(cost)],["Payback",pay?f(pay,1)+" years":"–"],["CO₂ avoided/yr",f(co2,1)+" t"]];
+$("out").innerHTML=k.map(function(x){return '<div class="k"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>'}).join("");
+var mo=F.map(function(x){return perDay*30.4*x});var mx=Math.max.apply(null,mo);
+$("bars").innerHTML=mo.map(function(v){return '<div title="'+f(v)+' kWh" style="height:'+(v/mx*100)+'%"></div>'}).join("");
+$("lab").innerHTML=M.map(function(m){return '<span>'+m+'</span>'}).join("");
+$("n").textContent="Monthly bars are an illustrative seasonal pattern (monsoon dip) around your average.";
+}
+calc();
+</script>
+</body>
+</html>
